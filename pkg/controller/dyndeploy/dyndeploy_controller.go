@@ -119,7 +119,7 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		err = r.Create(context.TODO(), deploy)
 		if err != nil {
-			log.Fatalf("Error creating Deployment %s/%s: %s\n", deploy.Namespace, deploy.Name, err)
+			log.Printf("Error creating Deployment %s/%s: %s\n", deploy.Namespace, deploy.Name, err)
 			return reconcile.Result{}, err
 		}
 	} else if err != nil {
