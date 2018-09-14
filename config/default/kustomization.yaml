@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: dynamic-deploy-system
+namespace: dyndeploy-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: dynamic-deploy-
+namePrefix: dyndeploy-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
@@ -18,8 +18,9 @@ namePrefix: dynamic-deploy-
 # YAML string, with resources separated by document
 # markers ("---").
 resources:
-- ../rbac/*.yaml
-- ../manager/*.yaml
+- ../rbac/rbac_role_binding.yaml
+- ../rbac/rbac_role.yaml
+- ../manager/manager.yaml
 
 patches:
 - manager_image_patch.yaml

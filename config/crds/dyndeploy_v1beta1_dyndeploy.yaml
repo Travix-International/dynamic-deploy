@@ -21,8 +21,23 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            image:
+              pattern: .+(:.+)?
+              type: string
+            keys:
+              items:
+                type: string
+              type: array
+            replicas:
+              format: int32
+              type: integer
           type: object
         status:
+          properties:
+            healthyReplicas:
+              format: int32
+              type: integer
           type: object
   version: v1beta1
 status:
