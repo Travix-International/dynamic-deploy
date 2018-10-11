@@ -94,7 +94,6 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -103,6 +102,9 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Calculate the expected Deployment Spec
 	spec := getDeploymentSpec(request, dd)
+
+	// TODO(varins): do something with the keys.
+	log.Printf("keys: %v", dd.Spec.Keys)
 
 	// Define the desired Deployment object
 	deploy := &appsv1.Deployment{Spec: spec}

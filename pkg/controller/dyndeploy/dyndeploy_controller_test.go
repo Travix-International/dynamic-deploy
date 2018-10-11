@@ -43,7 +43,7 @@ func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	instance := &dyndeployv1beta1.DynDeploy{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-		Spec:       dyndeployv1beta1.DynDeploySpec{Replicas: 1, Image: "nginx"}}
+		Spec:       dyndeployv1beta1.DynDeploySpec{Replicas: 1, Image: "nginx", Keys: []string{"ct.nl", "bua.com"}}}
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
