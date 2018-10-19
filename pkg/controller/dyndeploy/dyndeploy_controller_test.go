@@ -35,7 +35,6 @@ import (
 var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
 
 const timeout = time.Second * 5
 
@@ -58,7 +57,6 @@ func TestReconcile(t *testing.T) {
 	// Create the DynDeploy object and expect the Reconcile and Deployment to be created
 	err = c.Create(context.TODO(), instance)
 	// The instance object may not be a valid object because it might be missing some required fields.
-	// Please modify the instance object by adding required fields and then remove the following if statement.
 	if apierrors.IsInvalid(err) {
 		t.Logf("failed to create object, got an invalid object error: %v", err)
 		return
@@ -67,17 +65,27 @@ func TestReconcile(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
-	deploy := &appsv1.Deployment{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+	// Deploys
+	deployCtnl := &appsv1.Deployment{}
+	deployBuacom := &appsv1.Deployment{}
+	var depKeyCtnl = types.NamespacedName{Name: "foo-ctnl", Namespace: "default"}
+	var depKeyBuacom = types.NamespacedName{Name: "foo-buacom", Namespace: "default"}
+	g.Eventually(func() error { return c.Get(context.TODO(), depKeyCtnl, deployCtnl) }, timeout).
+		Should(gomega.Succeed())
+	g.Eventually(func() error { return c.Get(context.TODO(), depKeyBuacom, deployBuacom) }, timeout).
 		Should(gomega.Succeed())
 
-	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-	g.Expect(c.Delete(context.TODO(), deploy)).NotTo(gomega.HaveOccurred())
+	// Delete the Deployments and expect Reconcile to be called for Deployment deletion
+	g.Expect(c.Delete(context.TODO(), deployCtnl)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Delete(context.TODO(), deployBuacom)).NotTo(gomega.HaveOccurred())
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+
+	g.Eventually(func() error { return c.Get(context.TODO(), depKeyCtnl, deployCtnl) }, timeout).
+		Should(gomega.Succeed())
+	g.Eventually(func() error { return c.Get(context.TODO(), depKeyBuacom, deployBuacom) }, timeout).
 		Should(gomega.Succeed())
 
-	// Manually delete Deployment since GC isn't enabled in the test control plane
-	g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
-
+	// Manually delete Deployments since GC isn't enabled in the test control plane
+	g.Expect(c.Delete(context.TODO(), deployCtnl)).To(gomega.Succeed())
+	g.Expect(c.Delete(context.TODO(), deployBuacom)).To(gomega.Succeed())
 }

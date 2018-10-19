@@ -20,6 +20,7 @@ import (
 	"context"
 	"log"
 	"reflect"
+	"regexp"
 
 	dyndeployv1beta1 "github.com/Travix-International/dynamic-deploy/pkg/apis/dyndeploy/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -100,15 +101,32 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// Calculate the expected Deployment Spec
-	spec := getDeploymentSpec(request, dd)
-
-	// TODO(varins): do something with the keys.
 	log.Printf("keys: %v", dd.Spec.Keys)
+	for _, k := range dd.Spec.Keys {
+		err = r.createOrUpdateDeployment(request, dd, k)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+	return reconcile.Result{}, nil
+}
+
+func (r *DynDeployController) createOrUpdateDeployment(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy, key string) error {
+	var processedKey string
+	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
+	if err != nil {
+		log.Printf("Error compiling regex, using key as is.\n")
+		processedKey = key
+	} else {
+		processedKey = reg.ReplaceAllString(key, "")
+	}
+
+	// Calculate the expected Deployment Spec
+	spec := getDeploymentSpec(request, dd, processedKey)
 
 	// Define the desired Deployment object
 	deploy := &appsv1.Deployment{Spec: spec}
-	deploy.Name = request.Name
+	deploy.Name = request.Name + "-" + processedKey
 	deploy.Namespace = request.Namespace
 
 	// Check if the Deployment already exists
@@ -117,15 +135,16 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil && errors.IsNotFound(err) {
 		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
 		if err = controllerutil.SetControllerReference(dd, deploy, r.scheme); err != nil {
-			return reconcile.Result{}, err
+			return err
 		}
 		err = r.Create(context.TODO(), deploy)
 		if err != nil {
 			log.Printf("Error creating Deployment %s/%s: %s\n", deploy.Namespace, deploy.Name, err)
-			return reconcile.Result{}, err
+			return err
 		}
+		return nil
 	} else if err != nil {
-		return reconcile.Result{}, err
+		return err
 	}
 
 	// Update the found object and write the result back if there are any changes
@@ -134,13 +153,13 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
 		err = r.Update(context.TODO(), found)
 		if err != nil {
-			return reconcile.Result{}, err
+			return err
 		}
 	}
-	return reconcile.Result{}, nil
+	return nil
 }
 
-func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy) appsv1.DeploymentSpec {
+func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy, key string) appsv1.DeploymentSpec {
 	return appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
@@ -155,7 +174,7 @@ func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
-					{Name: request.Name,
+					{Name: request.Name + "-" + key,
 						Image: dd.Spec.Image},
 				},
 			},
