@@ -101,8 +101,15 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	for _, k := range dd.Spec.Keys {
-		err = r.createOrUpdateDeployment(request, dd, k)
+	if dd.Spec.Keys != nil {
+		for _, k := range dd.Spec.Keys {
+			err = r.createOrUpdateDeployment(request, dd, k)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	} else {
+		err = r.createOrUpdateDeployment(request, dd, "")
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -111,21 +118,22 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 }
 
 func (r *DynDeployController) createOrUpdateDeployment(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy, key string) error {
-	var processedKey string
+	deploymentSuffix := ""
 	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
-	if err != nil {
-		log.Printf("Error compiling regex, using key as is.\n")
-		processedKey = key
-	} else {
-		processedKey = reg.ReplaceAllString(key, "")
+	if key != "" {
+		if err != nil {
+			log.Printf("Error compiling regex, using key as is.\n")
+			deploymentSuffix = "-" + key
+		} else {
+			deploymentSuffix = "-" + reg.ReplaceAllString(key, "")
+		}
 	}
-
 	// Calculate the expected Deployment Spec
-	spec := getDeploymentSpec(request, dd, processedKey)
+	spec := getDeploymentSpec(request, dd, deploymentSuffix)
 
 	// Define the desired Deployment object
 	deploy := &appsv1.Deployment{Spec: spec}
-	deploy.Name = request.Name + "-" + processedKey
+	deploy.Name = request.Name + deploymentSuffix
 	deploy.Namespace = request.Namespace
 
 	// Check if the Deployment already exists
@@ -158,7 +166,7 @@ func (r *DynDeployController) createOrUpdateDeployment(request reconcile.Request
 	return nil
 }
 
-func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy, key string) appsv1.DeploymentSpec {
+func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy, deploymentSuffix string) appsv1.DeploymentSpec {
 	return appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
@@ -173,7 +181,7 @@ func getDeploymentSpec(request reconcile.Request, dd *dyndeployv1beta1.DynDeploy
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
-					{Name: request.Name + "-" + key,
+					{Name: request.Name + deploymentSuffix,
 						Image: dd.Spec.Image},
 				},
 			},

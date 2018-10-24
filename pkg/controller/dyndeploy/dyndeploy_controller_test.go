@@ -89,3 +89,47 @@ func TestReconcile(t *testing.T) {
 	g.Expect(c.Delete(context.TODO(), deployCtnl)).To(gomega.Succeed())
 	g.Expect(c.Delete(context.TODO(), deployBuacom)).To(gomega.Succeed())
 }
+
+func TestReconcileWithoutKeys(t *testing.T) {
+	var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
+	g := gomega.NewGomegaWithT(t)
+	instance := &dyndeployv1beta1.DynDeploy{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		Spec:       dyndeployv1beta1.DynDeploySpec{Replicas: 1, Image: "nginx"}}
+
+	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
+	// channel when it is finished.
+	mgr, err := manager.New(cfg, manager.Options{})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	c = mgr.GetClient()
+
+	recFn, requests := SetupTestReconcile(newReconciler(mgr))
+	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
+	defer close(StartTestManager(mgr, g))
+
+	// Create the DynDeploy object and expect the Reconcile and Deployment to be created
+	err = c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+
+	deploy := &appsv1.Deployment{}
+	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+		Should(gomega.Succeed())
+
+	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
+	g.Expect(c.Delete(context.TODO(), deploy)).NotTo(gomega.HaveOccurred())
+	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+		Should(gomega.Succeed())
+
+	// Manually delete Deployment since GC isn't enabled in the test control plane
+	g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
+
+}
