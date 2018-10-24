@@ -101,7 +101,6 @@ func (r *DynDeployController) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	log.Printf("keys: %v", dd.Spec.Keys)
 	for _, k := range dd.Spec.Keys {
 		err = r.createOrUpdateDeployment(request, dd, k)
 		if err != nil {
